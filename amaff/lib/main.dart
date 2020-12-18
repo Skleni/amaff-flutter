@@ -50,6 +50,9 @@ class LineUpModel extends ChangeNotifier {
       _selectedPlayers[position] =
           List.filled(_formation.playersPerPosition[position], null);
     }
+
+    // debug
+    _selectedPlayers[Position.midfield][3] = players[10];
   }
 
   Formation get formation => _formation;
@@ -124,13 +127,16 @@ class PositionPlayerSelections extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Consumer<LineUpModel>(builder: (context, lineUp, child) {
-      final children = List<PlayerSelection>.filled(
-          lineUp.selectedPlayers[_position].length, null);
+      final children =
+          List<Expanded>.filled(lineUp.selectedPlayers[_position].length, null);
       for (var i = 0; i < children.length; i++)
-        children[i] = PlayerSelection(_position, i);
+        children[i] = Expanded(
+          flex: 1,
+          child: PlayerSelection(_position, i),
+        );
 
       return Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: children);
+          children: children, crossAxisAlignment: CrossAxisAlignment.start);
     });
   }
 }
@@ -164,7 +170,10 @@ class PlayerSelection extends StatelessWidget {
                 .map((player) => PopupMenuItem<Player>(
                     value: player, child: Text(player.name)))
                 .toList()),
-        Text(text)
+        Text(
+          text,
+          textAlign: TextAlign.center,
+        )
       ]);
     });
   }
