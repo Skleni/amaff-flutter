@@ -16,6 +16,15 @@ class Formation {
     playersPerPosition[Position.midfield] = midfield;
     playersPerPosition[Position.forward] = forward;
   }
+
+  @override
+  String toString() {
+    return playersPerPosition[Position.defense].toString() +
+        '-' +
+        playersPerPosition[Position.midfield].toString() +
+        '-' +
+        playersPerPosition[Position.forward].toString();
+  }
 }
 
 class Player {
@@ -47,18 +56,36 @@ class LineUpModel extends ChangeNotifier {
 
   LineUpModel(this._formation) {
     for (var position in _formation.playersPerPosition.keys) {
-      _selectedPlayers[position] =
-          List.filled(_formation.playersPerPosition[position], null);
+      _selectedPlayers[position] = List<Player>.filled(
+          _formation.playersPerPosition[position], null,
+          growable: true);
     }
 
     // debug
-    _selectedPlayers[Position.midfield][3] = players[10];
+    //_selectedPlayers[Position.midfield][3] = players[10];
   }
 
   Formation get formation => _formation;
   set formation(Formation value) {
     _formation = value;
+    updateSelectedPlayers();
     notifyListeners();
+  }
+
+  void updateSelectedPlayers() {
+    for (var position in _formation.playersPerPosition.keys) {
+      var newPlayers = List<Player>.filled(
+          _formation.playersPerPosition[position], null,
+          growable: true);
+      for (int i = 0;
+          i < newPlayers.length && i < _selectedPlayers[position].length;
+          i++) {
+        newPlayers[i] = _selectedPlayers[position][i];
+      }
+
+      _selectedPlayers[position].clear();
+      _selectedPlayers[position].addAll(newPlayers);
+    }
   }
 
   UnmodifiableMapView<Position, UnmodifiableListView<Player>>
@@ -86,36 +113,62 @@ class AmaffApp extends StatelessWidget {
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
+    final formations = [
+      Formation(4, 3, 3),
+      Formation(3, 4, 3),
+      Formation(3, 5, 2),
+      Formation(4, 5, 1)
+    ];
+
     return MaterialApp(
-      title: 'AMAFF',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // Try running your application with "flutter run". You'll see the
-        // application has a blue toolbar. Then, without quitting the app, try
-        // changing the primarySwatch below to Colors.green and then invoke
-        // "hot reload" (press "r" in the console where you ran "flutter run",
-        // or simply save your changes to "hot reload" in a Flutter IDE).
-        // Notice that the counter didn't reset back to zero; the application
-        // is not restarted.
-        primaryColor: Colors.green,
-      ),
-      home: Scaffold(appBar: AppBar(title: Text('AMAFF')), body: LineUp()),
-    );
+        title: 'AMAFF',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          // This is the theme of your application.
+          //
+          // Try running your application with "flutter run". You'll see the
+          // application has a blue toolbar. Then, without quitting the app, try
+          // changing the primarySwatch below to Colors.green and then invoke
+          // "hot reload" (press "r" in the console where you ran "flutter run",
+          // or simply save your changes to "hot reload" in a Flutter IDE).
+          // Notice that the counter didn't reset back to zero; the application
+          // is not restarted.
+          primaryColor: Colors.green,
+        ),
+        home: ChangeNotifierProvider(
+          create: (context) => LineUpModel(formations.first),
+          child: Scaffold(
+              appBar: AppBar(title: Text('AMAFF'), actions: [
+                Consumer<LineUpModel>(builder: (context, lineUp, child) {
+                  return DropdownButton<Formation>(
+                    icon: Icon(Icons.dialpad, color: Colors.white),
+                    iconSize: 32,
+                    style: TextStyle(color: Colors.white, fontSize: 18.0),
+                    value: lineUp.formation,
+                    items: formations
+                        .map((f) => DropdownMenuItem(
+                            value: f,
+                            child: Text(f.toString(),
+                                style: TextStyle(color: Colors.black))))
+                        .toList(),
+                    onChanged: (f) => lineUp.formation = f,
+                  );
+                })
+              ]),
+              body: LineUp()),
+        ));
   }
 }
 
 class LineUp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-        create: (context) => LineUpModel(Formation(3, 5, 2)),
-        child: Consumer<LineUpModel>(builder: (context, lineUp, child) {
-          return Column(
-              children: lineUp.selectedPlayers.keys
-                  .map((position) => PositionPlayerSelections(position))
-                  .toList());
-        }));
+    return Consumer<LineUpModel>(builder: (context, lineUp, child) {
+      return Column(
+          children: lineUp.selectedPlayers.keys
+              .map((position) => PositionPlayerSelections(position))
+              .toList());
+    });
   }
 }
 
