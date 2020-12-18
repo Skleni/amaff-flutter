@@ -1,15 +1,85 @@
+import 'dart:collection';
+
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-typedef PlayerChanged = void Function(
-    Position position, int index, Player player);
+enum Position { goalkeeper, defense, midfield, forward }
 
-void main() {
-  runApp(MyApp());
+class Formation {
+  final Map<Position, int> playersPerPosition;
+
+  Formation(int defense, int midfield, int forward)
+      : assert(defense + midfield + forward == 10),
+        playersPerPosition = Map<Position, int>() {
+    playersPerPosition[Position.goalkeeper] = 1;
+    playersPerPosition[Position.defense] = defense;
+    playersPerPosition[Position.midfield] = midfield;
+    playersPerPosition[Position.forward] = forward;
+  }
 }
 
-// Package Provider -> wrappen in Consumer<AppState>
+class Player {
+  final String name;
+  final List<Position> positions;
 
-class MyApp extends StatelessWidget {
+  Player(this.name, this.positions);
+}
+
+class LineUpModel extends ChangeNotifier {
+  final players = UnmodifiableListView([
+    Player('Manuel Neuer', [Position.goalkeeper]),
+    Player('Thibaut Courtois', [Position.goalkeeper]),
+    Player('Alisson', [Position.goalkeeper]),
+    Player('Sergio Ramos', [Position.defense]),
+    Player('Andrew Robertson', [Position.defense]),
+    Player('Virgil van Dijk', [Position.defense]),
+    Player('David Alaba', [Position.defense, Position.midfield]),
+    Player('Kevin De Bruyne', [Position.midfield]),
+    Player('Thiago', [Position.midfield]),
+    Player('Lionel Messi', [Position.midfield, Position.forward]),
+    Player('Marko Arnautovic', [Position.midfield, Position.forward]),
+    Player('Robert Lewandowski', [Position.forward]),
+    Player('Erling Haaland', [Position.forward]),
+  ]);
+
+  final _selectedPlayers = Map<Position, List<Player>>();
+  var _formation;
+
+  LineUpModel(this._formation) {
+    for (var position in _formation.playersPerPosition.keys) {
+      _selectedPlayers[position] =
+          List.filled(_formation.playersPerPosition[position], null);
+    }
+  }
+
+  Formation get formation => _formation;
+  set formation(Formation value) {
+    _formation = value;
+    notifyListeners();
+  }
+
+  UnmodifiableMapView<Position, UnmodifiableListView<Player>>
+      get selectedPlayers => UnmodifiableMapView(_selectedPlayers
+          .map((key, value) => MapEntry(key, UnmodifiableListView(value))));
+
+  void onPlayerSelected(Position position, int number, Player player) {
+    _selectedPlayers.forEach((position, players) {
+      for (var i = 0; i < players.length; i++) {
+        if (players[i] == player) {
+          players[i] = null;
+        }
+      }
+    });
+    _selectedPlayers[position][number] = player;
+    notifyListeners();
+  }
+}
+
+void main() {
+  runApp(AmaffApp());
+}
+
+class AmaffApp extends StatelessWidget {
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
@@ -32,144 +102,70 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class Formation {
-  final Map<Position, int> playersPerPosition;
-
-  Formation(int defense, int midfield, int forward)
-      : assert(defense + midfield + forward == 10),
-        playersPerPosition = Map<Position, int>() {
-    playersPerPosition[Position.goalkeeper] = 1;
-    playersPerPosition[Position.defense] = defense;
-    playersPerPosition[Position.midfield] = midfield;
-    playersPerPosition[Position.forward] = forward;
-  }
-}
-
-enum Position { goalkeeper, defense, midfield, forward }
-
-class Player {
-  final String name;
-  final List<Position> positions;
-
-  Player(this.name, this.positions);
-}
-
-class LineUp extends StatefulWidget {
-  @override
-  _LineUpState createState() => _LineUpState();
-}
-
-class _LineUpState extends State<LineUp> {
-  final _players = [
-    Player('Manuel Neuer', [Position.goalkeeper]),
-    Player('Thibaut Courtois', [Position.goalkeeper]),
-    Player('Alisson', [Position.goalkeeper]),
-    Player('Sergio Ramos', [Position.defense]),
-    Player('Andrew Robertson', [Position.defense]),
-    Player('Virgil van Dijk', [Position.defense]),
-    Player('David Alaba', [Position.defense, Position.midfield]),
-    Player('Kevin De Bruyne', [Position.midfield]),
-    Player('Thiago', [Position.midfield]),
-    Player('Lionel Messi', [Position.midfield, Position.forward]),
-    Player('Marko Arnautovic', [Position.midfield, Position.forward]),
-    Player('Robert Lewandowski', [Position.forward]),
-    Player('Erling Haaland', [Position.forward]),
-  ];
-
-  final _formation = Formation(3, 5, 2);
-
-  var _selectedPlayers = Map<Position, List<Player>>();
-
-  _LineUpState() {
-    initializeSelectedPlayers();
-  }
-
-  initializeSelectedPlayers() {
-    _selectedPlayers.clear();
-    for (var position in _formation.playersPerPosition.keys) {
-      _selectedPlayers[position] =
-          List.filled(_formation.playersPerPosition[position], null);
-    }
-  }
-
-  void onPlayerSelected(Position position, int number, Player player) {
-    setState(() {
-      _selectedPlayers.forEach((position, players) {
-        for (var i = 0; i < players.length; i++) {
-          if (players[i] == player) {
-            players[i] = null;
-          }
-        }
-      });
-      _selectedPlayers[position][number] = player;
-    });
-  }
-
+class LineUp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Column(
-        children: _formation.playersPerPosition.keys
-            .map((position) => PositionPlayerSelections(
-                _selectedPlayers, position, _players, onPlayerSelected))
-            .toList());
+    return ChangeNotifierProvider(
+        create: (context) => LineUpModel(Formation(3, 5, 2)),
+        child: Consumer<LineUpModel>(builder: (context, lineUp, child) {
+          return Column(
+              children: lineUp.selectedPlayers.keys
+                  .map((position) => PositionPlayerSelections(position))
+                  .toList());
+        }));
   }
 }
 
 class PositionPlayerSelections extends StatelessWidget {
-  final Map<Position, List<Player>> _selectedPlayers;
   final Position _position;
-  final List<Player> _players;
-  final PlayerChanged onPlayerSelected;
 
-  PositionPlayerSelections(this._selectedPlayers, this._position, this._players,
-      this.onPlayerSelected);
+  PositionPlayerSelections(this._position);
 
   @override
   Widget build(BuildContext context) {
-    final children =
-        List<PlayerSelection>.filled(_selectedPlayers[_position].length, null);
-    for (var i = 0; i < children.length; i++)
-      children[i] = PlayerSelection(
-          _position,
-          _players,
-          this._selectedPlayers[_position][i],
-          (player) => onPlayerSelected(_position, i, player));
-    return Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: children);
+    return Consumer<LineUpModel>(builder: (context, lineUp, child) {
+      final children = List<PlayerSelection>.filled(
+          lineUp.selectedPlayers[_position].length, null);
+      for (var i = 0; i < children.length; i++)
+        children[i] = PlayerSelection(_position, i);
+
+      return Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: children);
+    });
   }
 }
 
 class PlayerSelection extends StatelessWidget {
   final Position _position;
-  final List<Player> _players;
-  final Player _selectedPlayer;
+  final int _number;
 
-  final ValueChanged<Player> onPlayerSelected;
-
-  PlayerSelection(this._position, this._players, this._selectedPlayer,
-      this.onPlayerSelected);
+  PlayerSelection(this._position, this._number);
 
   @override
   Widget build(BuildContext context) {
-    final text = _selectedPlayer?.name ??
-        _position.toString()[9].toUpperCase() +
-            _position.toString().substring(10);
+    return Consumer<LineUpModel>(builder: (context, lineUp, child) {
+      final selectedPlayer = lineUp.selectedPlayers[_position][_number];
+      final text = selectedPlayer?.name ??
+          _position.toString()[9].toUpperCase() +
+              _position.toString().substring(10);
 
-    return Column(children: [
-      PopupMenuButton<Player>(
-          onSelected: (Player player) => onPlayerSelected(player),
-          icon: Icon(
-            Icons.circle,
-            color: _selectedPlayer != null
-                ? Theme.of(context).primaryColor
-                : Theme.of(context).disabledColor,
-          ),
-          itemBuilder: (BuildContext context) => _players
-              .where((player) => player.positions.contains(_position))
-              .map((player) => PopupMenuItem<Player>(
-                  value: player, child: Text(player.name)))
-              .toList()),
-      Text(text)
-    ]);
+      return Column(children: [
+        PopupMenuButton<Player>(
+            onSelected: (Player player) =>
+                lineUp.onPlayerSelected(_position, _number, player),
+            icon: Icon(
+              Icons.circle,
+              color: selectedPlayer != null
+                  ? Theme.of(context).primaryColor
+                  : Theme.of(context).disabledColor,
+            ),
+            itemBuilder: (BuildContext context) => lineUp.players
+                .where((player) => player.positions.contains(_position))
+                .map((player) => PopupMenuItem<Player>(
+                    value: player, child: Text(player.name)))
+                .toList()),
+        Text(text)
+      ]);
+    });
   }
 }
